@@ -1,0 +1,59 @@
+---
+title: "RText Tools"
+author: "Catlin"
+date: "November 17, 2015"
+output: html_document
+---
+
+Sources:
+
+- Jared Landers
+- "6 - 7 - Precision, Recall, and the F measure - Stanford NLP," Professor Dan Jurafsky & Chris Manning, https://www.youtube.com/watch?v=2akd6uwtowc
+- "Evaluation 6: precision and recall," Victor Lavrenko, https://www.youtube.com/watch?v=mctizdBujk4
+
+```{r}
+library('RTextTools')
+data("NYTimes", package="RTextTools")
+View(NYTimes)
+```
+
+# Create Term-Document Matrix
+Remove numbers, stem words, remove common words
+Create sparse matrix - only stores cells that contain information
+```{r}
+timesMat <- create_matrix(NYTimes->Title, language = "english", removeNumbers = TRUE, stemWords = TRUE, removeSparseTerms = 0.998)
+timesMat
+container <- create_container(timesMat, labels=NYTimes$Topic.Code, trainSize = 1:2500, testSize = 2501:NROW(NYTimes), virgin = FALSE)
+
+# fit models
+SVM <- train_model(container, "SVM")
+GLMNET <- train_model(container, "GLMNET")
+# MAXENT <- train_model(container, "MAXENT")
+
+# test models
+SVM_CLASSIFY <- classify_model(container, SVM)
+GLMNET_CLASSIFY <- classify_model(container, GLMNET)
+
+# run analytics
+analytics <- create_analytics(container, cbind(SVM_CLASSIFY, GLMNET_CLASSIFY))
+str(analytics)
+summary(analytics)
+
+head(analytics@algorithm_summary)
+head(analytics@label_summary)
+head(analytics@document_summary)
+analytics@ensemble_summary
+
+# Confusion Matrices -- look for possible problems
+table(true = analytics@document_summary$MANUAL_CODE, predict = analytics@document_summary$CONSENSUS_CODE)
+table(true = analytics@document_summary$MANUAL_CODE, predict = analytics@document_summary$PROBABILITY_CODE)
+table(true = analytics@document_summary$MANUAL_CODE, predict = analytics@document_summary$SVM_LABEL)
+table(true = analytics@document_summary$MANUAL_CODE, predict = analytics@document_summary$GLMNET_LABEL)
+
+# table(true = analytics@document_summary$MANUAL_CODE, predict = analytics@document_summary$MAXENTROPY_LABEL)
+
+setwd("c:/data")
+write.csv(analytics@document_summary, "DocumentSummary.csv")
+```
+
+
